@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <base target="_top">
+  <style>
+    body { font-family: 'Malgun Gothic', sans-serif; background-color: #f4f7f6; color: #333; padding: 20px; }
+    .container { max-width: 650px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    h2 { text-align: center; color: #2980b9; border-bottom: 2px solid #ecf0f1; padding-bottom: 15px; margin-bottom: 25px; }
+    label { font-weight: bold; display: block; margin-top: 20px; color: #2c3e50; }
+    input[type="text"], select { width: 100%; padding: 12px; margin-top: 8px; border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 15px; }
+    
+    /* 카드 UI 스타일 */
+    .card-container { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+    .card { padding: 10px 15px; border: 1px solid #bdc3c7; border-radius: 20px; cursor: pointer; font-size: 14px; background-color: #fff; transition: all 0.2s ease; user-select: none; }
+    .card:hover { border-color: #2980b9; background-color: #ebf5fb; }
+    .card.active { background-color: #2980b9; color: white; border-color: #2980b9; font-weight: bold; }
+    
+    button { width: 100%; padding: 15px; background-color: #2980b9; color: white; border: none; border-radius: 6px; margin-top: 30px; font-size: 16px; font-weight: bold; cursor: pointer; transition: background 0.3s; }
+    button:hover { background-color: #2471a3; }
+    
+    #result-box { margin-top: 30px; display: none; }
+    .loading { color: #e67e22; font-weight: bold; text-align: center; padding: 20px; }
+    
+    /* 토글(Details) 스타일 */
+    details { background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 6px; margin-bottom: 15px; padding: 10px 15px; }
+    summary { font-weight: bold; font-size: 16px; color: #2c3e50; cursor: pointer; outline: none; list-style: none; display: flex; justify-content: space-between; align-items: center; }
+    summary::-webkit-details-marker { display: none; }
+    summary::after { content: '▼'; font-size: 12px; color: #7f8c8d; }
+    details[open] summary::after { content: '▲'; }
+    .answer-box { margin-top: 15px; padding-top: 15px; border-top: 1px dashed #bdc3c7; color: #27ae60; font-size: 15px; line-height: 1.5; }
+  </style>
+  <script>
+    // 전 직군 데이터 구조화
+    const jobData = {
+      "IT/개발": ["프론트엔드", "백엔드", "앱 개발", "데이터 분석/AI", "인프라/보안"],
+      "경영/기획": ["전략기획", "사업기획", "인사(HR)", "재무/회계", "총무"],
+      "마케팅/광고": ["퍼포먼스 마케팅", "브랜드 마케팅", "콘텐츠 마케팅", "AE(광고기획)"],
+      "영업/CS": ["B2B 영업", "B2C 영업", "해외영업", "CS/CX 기획"],
+      "디자인": ["UI/UX 디자인", "웹 디자인", "그래픽/편집 디자인", "영상 제작"]
+    };
+
+    function updateSubJobs() {
+      const mainJob = document.getElementById("mainJob").value;
+      const subJobSelect = document.getElementById("subJob");
+      subJobSelect.innerHTML = "<option value=''>상세 직무를 선택해주세요</option>";
+      
+      if (mainJob && jobData[mainJob]) {
+        jobData[mainJob].forEach(job => {
+          let option = document.createElement("option");
+          option.value = job;
+          option.text = job;
+          subJobSelect.add(option);
+        });
+      }
+    }
+
+    // 카드 다중 선택 토글 함수
+    function toggleCard(element) {
+      element.classList.toggle('active');
+    }
+
+    function generate() {
+      const company = document.getElementById('company').value;
+      const mainJob = document.getElementById('mainJob').value;
+      const subJob = document.getElementById('subJob').value;
+      
+      // 활성화된(active) 카드들의 텍스트만 모아서 배열로 만듦
+      const activeCards = document.querySelectorAll('.card.active');
+      const traits = Array.from(activeCards).map(card => card.innerText).join(', ');
+
+      if (!company || !mainJob || !subJob || traits.length === 0) {
+        alert("회사, 직무를 선택하고 어필 포인트를 1개 이상 선택해주세요.");
+        return;
+      }
+
+      const fullJob = mainJob + " - " + subJob;
+      const resultBox = document.getElementById('result-box');
+      const resultText = document.getElementById('result-text');
+      
+      resultBox.style.display = 'block';
+      resultText.innerHTML = "<div class='loading'>AI가 실무 적합성 질문과 모범 답안을 생성하고 있습니다...<br>(약 10~15초 소요)</div>";
+
+      // Apps Script 호출
+      google.script.run
+        .withSuccessHandler(function(response) {
+          resultText.innerHTML = response;
+        })
+        .withFailureHandler(function(error) {
+          resultText.innerHTML = "오류가 발생했습니다: " + error;
+        })
+        .generateQuestions(company, traits, fullJob);
+    }
+  </script>
+</head>
+<body>
+
+  <div class="container">
+    <h2>🎯 실무 중심 AI 면접관</h2>
+    
+    <label for="company">1. 지원할 회사명</label>
+    <input type="text" id="company" placeholder="예: 삼성전자, 네이버, 현대자동차 등">
+
+    <label for="mainJob">2. 지원 직무 (대분류)</label>
+    <select id="mainJob" onchange="updateSubJobs()">
+      <option value="">직군을 선택해주세요</option>
+      <option value="IT/개발">IT/개발 (Software & Data)</option>
+      <option value="경영/기획">경영/기획 (Business & HR)</option>
+      <option value="마케팅/광고">마케팅/광고 (Marketing & PR)</option>
+      <option value="영업/CS">영업/CS (Sales & Service)</option>
+      <option value="디자인">디자인 (Design & Media)</option>
+    </select>
+
+    <label for="subJob">3. 상세 직무 (소분류)</label>
+    <select id="subJob">
+      <option value="">상세 직무를 선택해주세요</option>
+    </select>
+
+    <label>4. 본인의 핵심 어필 포인트 (다중 선택 가능)</label>
+    <div class="card-container" id="trait-cards">
+      <div class="card" onclick="toggleCard(this)">뛰어난 커뮤니케이션/협업</div>
+      <div class="card" onclick="toggleCard(this)">빠른 실행력과 적응력</div>
+      <div class="card" onclick="toggleCard(this)">데이터 기반의 의사결정</div>
+      <div class="card" onclick="toggleCard(this)">논리적인 문제 해결</div>
+      <div class="card" onclick="toggleCard(this)">최신 트렌드/기술 리서치</div>
+      <div class="card" onclick="toggleCard(this)">꼼꼼한 문서화/기획력</div>
+      <div class="card" onclick="toggleCard(this)">리더십 및 프로젝트 매니징</div>
+      <div class="card" onclick="toggleCard(this)">글로벌/외국어 역량</div>
+    </div>
+
+    <button onclick="generate()">실무 면접 질문 10개 추출하기</button>
+
+    <div id="result-box">
+      <h3 style="color: #2980b9; border-bottom: 2px solid #ecf0f1; padding-bottom: 10px;">💡 면접 질문 및 모범 답안 (클릭하여 확인)</h3>
+      <div id="result-text"></div>
+    </div>
+  </div>
+
+</body>
+</html>
